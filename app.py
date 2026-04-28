@@ -221,4 +221,5 @@ def start_bot(business_id):
 if __name__ == "__main__":
     db.init_db()
     db.migrate_add_delay_seconds()
-    app.run(debug=True, port=5000)
+    #app.run(debug=True, port=5000)
+    app.run(debug=False, port=5000)

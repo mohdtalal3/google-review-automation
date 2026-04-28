@@ -64,33 +64,35 @@ def post_review(email, password, maps_url, star_rating, review_text, email_id, r
         with SB(uc=True, user_data_dir=profile_dir,proxy=PROXY) as sb:
             # Check login state
             sb.open("https://accounts.google.com/signin/v2/identifier")
-            time.sleep(5)
+            time.sleep(10)
 
             if "accounts.google.com/v3/signin" in sb.get_current_url():
                 # Sign in with email
                 time.sleep(2)
+                sb.click('input[type="email"]', timeout=15)
                 sb.type('input[type="email"]', email)
                 time.sleep(3)
                 sb.click("#identifierNext")
                 time.sleep(5)
+                sb.click('input[type="password"]', timeout=10)
                 sb.type('input[type="password"]', password)
                 time.sleep(3)
                 sb.click("#passwordNext")
                 time.sleep(5)
                 try:
                     sb.click('//button[.//span[text()="Not now"]]', timeout=10)
-                except Exception:
-                    pass
-                time.sleep(3)
-                try:
-                    sb.type('input[type="email"]', recovery_email or email, timeout=10)
-                    time.sleep(2)
-                    sb.click('button[aria-label="Save"]', timeout=10)
-                except Exception:
-                    pass
-                time.sleep(3)
-                try:
-                    sb.click('button[aria-label="Skip"]', timeout=10)
+                    time.sleep(5)
+                    try:
+                        sb.type('input[type="email"]', recovery_email or email, timeout=15)
+                        time.sleep(4)
+                        sb.click('button[aria-label="Save"]', timeout=10)
+                        time.sleep(6)
+                    except Exception:
+                        pass
+                    try:
+                        sb.click('button[aria-label="Skip"]', timeout=10)
+                    except Exception:
+                        pass
                 except Exception:
                     pass
                 time.sleep(5)
@@ -98,18 +100,18 @@ def post_review(email, password, maps_url, star_rating, review_text, email_id, r
 
             sb.open(maps_url)
             time.sleep(random.uniform(3, 5))
-            sb.click("//div[text()='Reviews']", timeout=10)
+            sb.click('button[aria-label*="Reviews"]', timeout=15)
             time.sleep(random.uniform(3, 5))
-            sb.click("//span[text()='Write a review']", timeout=10)
+            sb.click('button[aria-label="Write a review"]', timeout=15)
             time.sleep(random.uniform(3, 5))
             sb.switch_to_frame("iframe[name='goog-reviews-write-widget']")
-            sb.click(f"div[data-rating='{star_rating}'][role='radio']", timeout=10)
+            sb.click(f"div[data-rating='{star_rating}'][role='radio']", timeout=15)
             time.sleep(random.uniform(3, 5))
-            sb.type("//textarea[@aria-label='Enter review']", review_text)
+            sb.type('textarea[aria-label="Enter review"]', review_text)
             time.sleep(random.uniform(3, 5))
-            sb.click("//button[.//span[text()='Post']]", timeout=10)
+            sb.click("//button[.//span[text()='Post']]", timeout=15)
             time.sleep(random.uniform(3, 5))
-
+            sb.click('button[aria-label="Done"]', timeout=10)
         db.update_review_status(email_id, "reviewed", review_text, star_rating)
         return True
 
