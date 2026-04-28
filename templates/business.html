@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ business.name }}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 min-h-screen text-white">
+
+  <!-- Nav -->
+  <nav class="bg-slate-800 border-b border-slate-700 px-6 py-4 flex items-center gap-3">
+    <a href="/dashboard"
+       class="text-slate-400 hover:text-white transition-colors shrink-0">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+      </svg>
+    </a>
+    <div class="min-w-0">
+      <h1 class="text-base font-bold text-white truncate">{{ business.name }}</h1>
+      <p class="text-slate-500 text-xs truncate max-w-xl">{{ business.url }}</p>
+    </div>
+  </nav>
+
+  <div class="max-w-7xl mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+    <!-- ══════════════ LEFT PANEL ══════════════ -->
+    <div class="space-y-6">
+
+      <!-- Success toast -->
+      {% if request.args.get('saved') %}
+      <div id="success-toast"
+           class="bg-green-950 border border-green-700 text-green-300 rounded-xl px-5 py-3
+                  flex items-center gap-3 text-sm">
+        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M5 13l4 4L19 7"/>
+        </svg>
+        Configuration saved successfully.
+      </div>
+      <script>setTimeout(() => { const t = document.getElementById('success-toast'); if(t) t.remove(); }, 4000);</script>
+      {% endif %}
+
+      <!-- Review Configuration -->
+      <div class="bg-slate-800 rounded-2xl p-6 border border-slate-700">
+        <h2 class="text-base font-semibold mb-5">Review Configuration</h2>
+        <form method="POST" action="/business/{{ business.id }}/save-config"
+              class="space-y-4">
+
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <label class="text-xs text-slate-400">Review Prompt</label>
+              <button type="button" onclick="copyPrompt()"
+                      class="flex items-center gap-1.5 text-xs text-slate-400 hover:text-blue-400
+                             transition-colors bg-slate-700 hover:bg-slate-600 px-3 py-1.5
+                             rounded-lg border border-slate-600">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8
+                       a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                </svg>
+                <span id="copy-btn-label">Copy ChatGPT Prompt</span>
+              </button>
+            </div>
+            <textarea id="review-prompt-input" name="review_prompt" rows="5"
+                      placeholder="Describe the business and how you want reviews written. e.g. Joe's Pizza is a family-owned Italian restaurant. Mention the wood-fired crust, generous portions, and friendly staff. Keep it casual like a real customer."
+                      class="w-full bg-slate-700 border border-slate-600 text-white rounded-xl
+                             px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500
+                             placeholder-slate-500 resize-none text-sm"
+            >{{ config.business_description if config else '' }}</textarea>
+            <p class="text-slate-600 text-xs mt-1.5">
+              Paste the business description and any style notes here. Use the button above
+              to copy a ready-made ChatGPT prompt to help you write this.
+            </p>
+          </div>
+
+          <div>
+            <label class="block text-xs text-slate-400 mb-1.5">
+              Delay between reviews
+              <span class="text-slate-600 font-normal ml-1">(seconds, min 5)</span>
+            </label>
+            <input type="number" name="delay_seconds" min="5"
+                   value="{{ config.delay_seconds if config and config.delay_seconds else 60 }}"
+                   class="w-full bg-slate-700 border border-slate-600 text-white rounded-xl
+                          px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500
+                          text-sm text-center" />
+            <p class="text-slate-600 text-xs mt-1">
+              The worker waits this many seconds between each review.
+            </p>
+          </div>
+
+          <button id="save-config-btn" type="submit"
+                  class="w-full bg-blue-600 hover:bg-blue-500 text-white rounded-xl
+                         py-2.5 font-medium text-sm transition-colors">
+            Save Configuration
+          </button>
+        </form>
+      </div>
+
+      <!-- Star Distribution + Queue -->
+      <div class="bg-slate-800 rounded-2xl p-6 border border-slate-700">
+        <h2 class="text-base font-semibold mb-1">Queue Reviews</h2>
+        <p class="text-slate-500 text-xs mb-4">Pick how many reviews per star rating to queue now. These are not saved.</p>
+
+        <!-- Pool info -->
+        <div class="flex items-center justify-between mb-3 text-xs">
+          <span class="text-slate-500">
+            <span class="text-white font-medium">{{ total_pool - already_queued - already_reviewed }}</span>
+            available &nbsp;·&nbsp;
+            <span class="text-yellow-400 font-medium">{{ already_queued }}</span>
+            queued &nbsp;·&nbsp;
+            <span class="text-green-400 font-medium">{{ already_reviewed }}</span>
+            reviewed
+          </span>
+          <span>
+            Selecting:
+            <span id="assigned-count" class="font-semibold text-white">0</span>
+          </span>
+        </div>
+
+        <!-- Over-limit warning -->
+        <div id="limit-warning"
+             class="hidden mb-3 bg-red-950 border border-red-700 text-red-300
+                    rounded-xl px-4 py-2.5 text-xs flex items-center gap-2">
+          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3
+                 L13.71 3.86a2 2 0 00-3.42 0z"/>
+          </svg>
+          Exceeds available emails. Reduce the counts.
+        </div>
+
+        <div class="space-y-2.5 mb-4">
+          {% for star in range(1, 6) %}
+          <div class="flex items-center gap-3">
+            <div class="flex items-center gap-0.5 w-24 shrink-0">
+              {% for i in range(star) %}
+              <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462
+                         c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292
+                         c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034
+                         c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72
+                         c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+              </svg>
+              {% endfor %}
+              {% for i in range(5 - star) %}
+              <svg class="w-4 h-4 text-slate-600" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462
+                         c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292
+                         c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034
+                         c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72
+                         c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+              </svg>
+              {% endfor %}
+            </div>
+            <input type="number" id="star_{{ star }}_count" min="0" value="0"
+                   oninput="updateCounter()"
+                   class="star-input w-28 bg-slate-700 border border-slate-600 text-white
+                          rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2
+                          focus:ring-blue-500 text-base text-center" />
+            <span class="text-slate-400 text-sm">emails</span>
+          </div>
+          {% endfor %}
+        </div>
+
+        <button id="start-bot-btn"
+                onclick="startBot()"
+                class="w-full py-3 rounded-xl font-semibold text-sm transition-colors
+                       bg-green-600 hover:bg-green-500 text-white">
+          Queue Reviews
+        </button>
+      </div>
+
+      <!-- Worker status -->
+      <div class="bg-slate-800 rounded-2xl px-5 py-4 border border-slate-700 flex items-center gap-2">
+        <div class="w-2.5 h-2.5 rounded-full {{ 'bg-green-400 animate-pulse' if is_running else 'bg-slate-500' }} shrink-0"></div>
+        <span class="text-sm {{ 'text-green-400' if is_running else 'text-slate-400' }}">
+          {{ 'Worker is processing a review...' if is_running else 'Worker is idle — refresh to update' }}
+        </span>
+      </div>
+
+    </div>
+
+    <!-- ══════════════ RIGHT PANEL ══════════════ -->
+    <div class="space-y-6">
+
+      <!-- Review jobs list -->
+      <div class="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+          <div>
+            <h2 class="text-base font-semibold">Review Jobs</h2>
+            <p class="text-slate-500 text-xs mt-0.5">
+              Created when you click Start Bot. Emails assigned from the global pool.
+            </p>
+          </div>
+          <span class="text-slate-500 text-sm">{{ reviews | length }} total</span>
+        </div>
+
+        {% if reviews %}
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-slate-700 text-slate-500 text-xs uppercase tracking-wide">
+                <th class="text-left px-6 py-3">Email</th>
+                <th class="text-center px-4 py-3">Stars</th>
+                <th class="text-center px-4 py-3">Status</th>
+                <th class="text-right px-6 py-3">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in reviews %}
+              <tr class="border-b border-slate-700/40 hover:bg-slate-700/20"
+                  id="review-row-{{ r.id }}">
+                <td class="px-6 py-3 text-slate-300 max-w-52">
+                  <span class="truncate block">{{ r.email }}</span>
+                </td>
+                <td class="px-4 py-3 text-center">
+                  {% if r.star_rating %}
+                  <span class="text-yellow-400 text-xs">{{ '★' * r.star_rating }}</span>
+                  {% else %}
+                  <span class="text-slate-600 text-xs">—</span>
+                  {% endif %}
+                </td>
+                <td class="px-4 py-3 text-center">
+                  <span class="status-badge px-2.5 py-1 rounded-lg text-xs font-medium
+                    {% if r.status == 'reviewed' %}bg-green-950 text-green-400
+                    {% elif r.status == 'reviewing' %}bg-yellow-950 text-yellow-400
+                    {% elif r.status == 'failed' %}bg-red-950 text-red-400
+                    {% else %}bg-slate-700 text-slate-400{% endif %}">
+                    {{ r.status }}
+                  </span>
+                </td>
+                <td class="px-6 py-3">
+                  <div class="flex items-center justify-end gap-3">
+                    {% if r.review_text %}
+                    <button onclick="showReview(this)"
+                            data-review="{{ r.review_text | e }}"
+                            class="text-slate-400 hover:text-blue-400 transition-colors text-xs
+                                   font-medium">
+                      View
+                    </button>
+                    {% endif %}
+                    {% if r.status in ['failed', 'reviewed'] %}
+                    <form method="POST"
+                          action="/business/{{ business.id }}/reset-review/{{ r.id }}"
+                          class="inline">
+                      <button type="submit"
+                              class="text-slate-400 hover:text-yellow-400 transition-colors
+                                     text-xs font-medium">
+                        Reset
+                      </button>
+                    </form>
+                    {% endif %}
+                    <form method="POST"
+                          action="/business/{{ business.id }}/delete-review/{{ r.id }}"
+                          class="inline"
+                          onsubmit="return confirm('Delete this review job?')">
+                      <button type="submit"
+                              class="text-slate-500 hover:text-red-400 transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858
+                               L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                      </button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="px-6 py-14 text-center">
+          <p class="text-slate-500 text-sm">
+            No review jobs yet. Save your configuration and click Start Bot.
+          </p>
+        </div>
+        {% endif %}
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Review text modal -->
+  <div id="review-modal"
+       class="hidden fixed inset-0 bg-black/70 items-center justify-center z-50 p-4">
+    <div class="bg-slate-800 rounded-2xl p-6 max-w-lg w-full border border-slate-700 shadow-2xl">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-semibold text-white">Review Text</h3>
+        <button onclick="closeModal()"
+                class="text-slate-400 hover:text-white transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <p id="modal-review-text" class="text-slate-300 text-sm leading-relaxed"></p>
+    </div>
+  </div>
+
+  <script>
+    const BUSINESS_ID = {{ business.id }};
+
+    // ── Modal ──────────────────────────────────────────────────────────────────
+    function showReview(btn) {
+      document.getElementById('modal-review-text').textContent = btn.getAttribute('data-review');
+      const modal = document.getElementById('review-modal');
+      modal.style.display = 'flex';
+    }
+
+    function closeModal() {
+      document.getElementById('review-modal').style.display = 'none';
+    }
+
+    document.getElementById('review-modal').addEventListener('click', function (e) {
+      if (e.target === this) closeModal();
+    });
+
+    // ── Bot ────────────────────────────────────────────────────────────────────
+    function startBot() {
+      const btn = document.getElementById('start-bot-btn');
+      btn.disabled = true;
+      btn.textContent = 'Queuing...';
+
+      const formData = new FormData();
+      document.querySelectorAll('.star-input').forEach(inp => {
+        formData.append(inp.id, inp.value);
+      });
+
+      fetch(`/business/${BUSINESS_ID}/start-bot`, { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+          if (data.status === 'queued') {
+            const parts = [];
+            if (data.jobs_created > 0) parts.push(`${data.jobs_created} new job(s) queued`);
+            if (data.already_pending > 0) parts.push(`${data.already_pending} already pending`);
+            alert(parts.join(' · '));
+            window.location.reload();
+          } else if (data.status === 'error') {
+            alert(data.message);
+            btn.disabled = false;
+            btn.textContent = 'Queue Reviews';
+          }
+        })
+        .catch(() => {
+          btn.disabled = false;
+          btn.textContent = 'Queue Reviews';
+        });
+    }
+
+    // ── Star distribution counter ──────────────────────────────────────────────
+    const AVAILABLE = {{ total_pool - already_queued - already_reviewed }};
+
+    function updateCounter() {
+      const inputs = document.querySelectorAll('.star-input');
+      let total = 0;
+      inputs.forEach(inp => { total += parseInt(inp.value) || 0; });
+
+      const countEl = document.getElementById('assigned-count');
+      const warning = document.getElementById('limit-warning');
+      const queueBtn = document.getElementById('start-bot-btn');
+
+      countEl.textContent = total;
+
+      const over = total > AVAILABLE;
+      countEl.className = over ? 'font-semibold text-red-400' : 'font-semibold text-white';
+      warning.classList.toggle('hidden', !over);
+      warning.classList.toggle('flex', over);
+      queueBtn.disabled = over;
+    }
+
+    updateCounter();
+    function copyPrompt() {
+      const bizName = {{ business.name | tojson }};
+      const bizUrl  = {{ business.url | tojson }};
+      const prompt  =
+        `I need to write Google reviews for a business. Please search the internet and help me fill in the following details.\n\n` +
+        `Business name: ${bizName}\n` +
+        `Google Maps link: ${bizUrl}\n\n` +
+        `Based on the business page and any online information you can find, write a detailed review prompt I can use.\n` +
+        `It should include:\n` +
+        `1. A short description of the business (what they do, location, speciality, atmosphere)\n` +
+        `2. Key things to mention in reviews (popular items, standout qualities, staff, service speed, etc.)\n` +
+        `3. The tone and writing style to use (casual, enthusiastic, like a genuine satisfied customer)\n\n` +
+        `Return it as a single plain paragraph I can paste directly as review instructions.`;
+
+      navigator.clipboard.writeText(prompt).then(() => {
+        const lbl = document.getElementById('copy-btn-label');
+        lbl.textContent = 'Copied!';
+        setTimeout(() => { lbl.textContent = 'Copy ChatGPT Prompt'; }, 2500);
+      });
+    }
+
+    // Run once on load to set initial state
+    updateCounter();
+  </script>
+
+</body>
+</html>

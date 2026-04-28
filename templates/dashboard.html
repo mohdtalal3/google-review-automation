@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 min-h-screen text-white">
+
+  <!-- Nav -->
+  <nav class="bg-slate-800 border-b border-slate-700 px-6 py-4 flex items-center justify-between">
+    <h1 class="text-lg font-bold text-white">Review Manager</h1>
+    <a href="/logout"
+       class="text-slate-400 hover:text-white text-sm transition-colors">
+      Sign Out
+    </a>
+  </nav>
+
+  <div class="max-w-6xl mx-auto px-6 py-8">
+
+    <!-- Add business card -->
+    <div class="bg-slate-800 rounded-2xl p-6 mb-8 border border-slate-700">
+      <h2 class="text-base font-semibold text-white mb-4">Add Business</h2>
+      <form method="POST" action="/business/add"
+            class="flex flex-wrap gap-3 items-end">
+        <div class="flex-1 min-w-48">
+          <label class="block text-xs text-slate-400 mb-1">Business Name</label>
+          <input type="text" name="name" placeholder="e.g. Joe's Pizza"
+                 required
+                 class="w-full bg-slate-700 border border-slate-600 text-white rounded-xl
+                        px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500
+                        placeholder-slate-500 text-sm" />
+        </div>
+        <div class="flex-1 min-w-64">
+          <label class="block text-xs text-slate-400 mb-1">Google Maps URL</label>
+          <input type="url" name="url" placeholder="https://maps.app.goo.gl/..."
+                 required
+                 class="w-full bg-slate-700 border border-slate-600 text-white rounded-xl
+                        px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500
+                        placeholder-slate-500 text-sm" />
+        </div>
+        <button type="submit"
+                class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-xl
+                       font-medium text-sm transition-colors whitespace-nowrap">
+          Add Business
+        </button>
+      </form>
+    </div>
+
+    <!-- Global Email Pool -->
+    <div class="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden mb-8">
+      <div class="px-6 py-4 border-b border-slate-700 flex flex-wrap items-center gap-4">
+        <div class="flex-1 min-w-0">
+          <h2 class="text-base font-semibold text-white">Gmail Accounts Pool</h2>
+          <p class="text-slate-500 text-xs mt-0.5">
+            Shared across all businesses. {{ all_emails | length }} account{{ 's' if all_emails | length != 1 else '' }} loaded.
+          </p>
+        </div>
+        <!-- Upload CSV -->
+        <form method="POST" action="/emails/upload"
+              enctype="multipart/form-data" class="flex gap-2 shrink-0">
+          <input type="file" name="csv_file" accept=".csv" required
+                 class="bg-slate-700 border border-slate-600 text-slate-400 rounded-xl
+                        px-3 py-2 text-xs
+                        file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0
+                        file:bg-blue-600 file:text-white file:text-xs file:cursor-pointer
+                        file:hover:bg-blue-500" />
+          <button type="submit"
+                  class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl
+                         text-xs font-medium transition-colors whitespace-nowrap">
+            Upload CSV
+          </button>
+        </form>
+        <a href="/emails/sample-csv"
+           class="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white
+                  bg-slate-700 hover:bg-slate-600 border border-slate-600 px-3 py-2
+                  rounded-xl transition-colors whitespace-nowrap shrink-0">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+          </svg>
+          Sample CSV
+        </a>
+      </div>
+
+      <!-- Add single email -->
+      <div class="px-6 py-4 border-b border-slate-700">
+        <form method="POST" action="/emails/add"
+              class="flex flex-wrap gap-3">
+          <input type="email" name="email" placeholder="Google email" required
+                 class="flex-1 min-w-40 bg-slate-700 border border-slate-600 text-white
+                        rounded-xl px-4 py-2 focus:outline-none focus:ring-2
+                        focus:ring-blue-500 placeholder-slate-500 text-sm" />
+          <input type="text" name="password" placeholder="Password" required
+                 autocomplete="off"
+                 class="flex-1 min-w-40 bg-slate-700 border border-slate-600 text-white
+                        rounded-xl px-4 py-2 focus:outline-none focus:ring-2
+                        focus:ring-blue-500 placeholder-slate-500 text-sm" />
+          <button type="submit"
+                  class="bg-slate-600 hover:bg-slate-500 text-white px-5 py-2 rounded-xl
+                         text-sm font-medium transition-colors">
+            Add Email
+          </button>
+        </form>
+      </div>
+
+      {% if all_emails %}
+      <div class="overflow-x-auto max-h-72 overflow-y-auto">
+        <table class="w-full text-sm">
+          <thead class="sticky top-0 bg-slate-800">
+            <tr class="border-b border-slate-700 text-slate-500 text-xs uppercase tracking-wide">
+              <th class="text-left px-6 py-3">Email</th>
+              <th class="text-right px-6 py-3">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for e in all_emails %}
+            <tr class="border-b border-slate-700/40 hover:bg-slate-700/20">
+              <td class="px-6 py-2.5 text-slate-300 text-sm">{{ e.email }}</td>
+              <td class="px-6 py-2.5 text-right">
+                <form method="POST" action="/emails/delete/{{ e.id }}"
+                      onsubmit="return confirm('Delete {{ e.email }}?')" class="inline">
+                  <button type="submit"
+                          class="text-slate-500 hover:text-red-400 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858
+                           L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="px-6 py-10 text-center">
+        <p class="text-slate-500 text-sm">No emails yet. Upload a CSV or add one above.</p>
+        <p class="text-slate-600 text-xs mt-1">CSV must have <code class="bg-slate-700 px-1 rounded">email</code> and <code class="bg-slate-700 px-1 rounded">password</code> columns.</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Business grid -->
+    <h2 class="text-base font-semibold text-white mb-4">Your Businesses</h2>
+
+    {% if businesses %}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {% for biz in businesses %}
+      <div class="bg-slate-800 rounded-2xl p-6 border border-slate-700
+                  hover:border-slate-500 transition-colors flex flex-col gap-4">
+
+        <div class="flex items-start justify-between">
+          <div class="min-w-0">
+            <h3 class="font-semibold text-white text-base truncate">{{ biz.name }}</h3>
+            <p class="text-slate-500 text-xs mt-0.5 truncate max-w-56">{{ biz.url }}</p>
+          </div>
+          <form method="POST" action="/business/{{ biz.id }}/delete"
+                onsubmit="return confirm('Delete {{ biz.name }} and all its data?')">
+            <button type="submit"
+                    class="text-slate-600 hover:text-red-400 transition-colors ml-2 shrink-0">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7
+                     m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+              </svg>
+            </button>
+          </form>
+        </div>
+
+        <div class="flex gap-3">
+          <div class="flex-1 bg-slate-700 rounded-xl px-3 py-2 text-center">
+            <div class="text-white font-bold text-xl leading-none">{{ biz.reviewed_count }}</div>
+            <div class="text-slate-400 text-xs mt-1">Reviewed</div>
+          </div>
+          <div class="flex-1 bg-slate-700 rounded-xl px-3 py-2 text-center">
+            <div class="text-white font-bold text-xl leading-none">{{ biz.assigned_emails }}</div>
+            <div class="text-slate-400 text-xs mt-1">Assigned</div>
+          </div>
+        </div>
+
+        <a href="/business/{{ biz.id }}"
+           class="block text-center bg-slate-700 hover:bg-slate-600 text-white rounded-xl
+                  py-2 text-sm font-medium transition-colors">
+          Manage
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+
+    {% else %}
+    <div class="bg-slate-800 rounded-2xl border border-slate-700 px-6 py-16 text-center">
+      <p class="text-slate-400 text-sm">No businesses yet. Add one above to get started.</p>
+    </div>
+    {% endif %}
+
+  </div>
+</body>
+</html>
