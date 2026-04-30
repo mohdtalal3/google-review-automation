@@ -387,11 +387,31 @@
         `3. The tone and writing style to use (casual, enthusiastic, like a genuine satisfied customer)\n\n` +
         `Return it as a single plain paragraph I can paste directly as review instructions.`;
 
-      navigator.clipboard.writeText(prompt).then(() => {
-        const lbl = document.getElementById('copy-btn-label');
-        lbl.textContent = 'Copied!';
-        setTimeout(() => { lbl.textContent = 'Copy ChatGPT Prompt'; }, 2500);
-      });
+      const lbl = document.getElementById('copy-btn-label');
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(prompt).then(() => {
+          lbl.textContent = 'Copied!';
+          setTimeout(() => { lbl.textContent = 'Copy ChatGPT Prompt'; }, 2500);
+        });
+      } else {
+        // Fallback for HTTP (non-secure) contexts
+        const ta = document.createElement('textarea');
+        ta.value = prompt;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        try {
+          document.execCommand('copy');
+          lbl.textContent = 'Copied!';
+          setTimeout(() => { lbl.textContent = 'Copy ChatGPT Prompt'; }, 2500);
+        } catch (e) {
+          lbl.textContent = 'Copy failed';
+          setTimeout(() => { lbl.textContent = 'Copy ChatGPT Prompt'; }, 2500);
+        }
+        document.body.removeChild(ta);
+      }
     }
 
     // Run once on load to set initial state
