@@ -69,27 +69,36 @@ def post_review(email, password, maps_url, star_rating, review_text, email_id, r
             if "accounts.google.com/v3/signin" in sb.get_current_url():
                 # Sign in with email
                 time.sleep(2)
+                sb.wait_for_element_clickable('input[type="email"]', by="css selector", timeout=15)
                 sb.click('input[type="email"]', timeout=15)
+                time.sleep(3)
                 sb.type('input[type="email"]', email)
                 time.sleep(3)
+                sb.wait_for_element_clickable("#identifierNext", by="css selector", timeout=15)
                 sb.click("#identifierNext")
                 time.sleep(5)
+                sb.wait_for_element_clickable('input[type="password"]', by="css selector", timeout=10)
                 sb.click('input[type="password"]', timeout=10)
+                time.sleep(3)
                 sb.type('input[type="password"]', password)
                 time.sleep(3)
+                sb.wait_for_element_clickable("#passwordNext", by="css selector", timeout=15)
                 sb.click("#passwordNext")
                 time.sleep(5)
                 try:
+                    sb.wait_for_element_clickable('//button[.//span[text()="Not now"]]', by="xpath", timeout=10)
                     sb.click('//button[.//span[text()="Not now"]]', timeout=10)
                     time.sleep(5)
                     try:
                         sb.type('input[type="email"]', recovery_email or email, timeout=15)
                         time.sleep(4)
+                        sb.wait_for_element_clickable('button[aria-label="Save"]', by="css selector", timeout=10)
                         sb.click('button[aria-label="Save"]', timeout=10)
                         time.sleep(6)
                     except Exception:
                         pass
                     try:
+                        sb.wait_for_element_clickable('button[aria-label="Skip"]', by="css selector", timeout=10)
                         sb.click('button[aria-label="Skip"]', timeout=10)
                     except Exception:
                         pass
@@ -100,17 +109,22 @@ def post_review(email, password, maps_url, star_rating, review_text, email_id, r
 
             sb.open(maps_url)
             time.sleep(random.uniform(3, 5))
+            sb.wait_for_element_clickable('button[aria-label*="Reviews"]', by="css selector", timeout=15)
             sb.click('button[aria-label*="Reviews"]', timeout=15)
             time.sleep(random.uniform(3, 5))
+            sb.wait_for_element_clickable('button[aria-label="Write a review"]', by="css selector", timeout=15)
             sb.click('button[aria-label="Write a review"]', timeout=15)
             time.sleep(random.uniform(3, 5))
             sb.switch_to_frame("iframe[name='goog-reviews-write-widget']")
+            sb.wait_for_element_clickable(f"div[data-rating='{star_rating}'][role='radio']", by="css selector", timeout=15)
             sb.click(f"div[data-rating='{star_rating}'][role='radio']", timeout=15)
             time.sleep(random.uniform(3, 5))
             sb.type('textarea[aria-label="Enter review"]', review_text)
             time.sleep(random.uniform(3, 5))
+            sb.wait_for_element_clickable("//button[.//span[text()='Post']]", by="xpath", timeout=15)
             sb.click("//button[.//span[text()='Post']]", timeout=15)
             time.sleep(random.uniform(3, 5))
+            sb.wait_for_element_clickable('button[aria-label="Done"]', by="css selector", timeout=10)
             sb.click('button[aria-label="Done"]', timeout=10)
         db.update_review_status(email_id, "reviewed", review_text, star_rating)
         return True
