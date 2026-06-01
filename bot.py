@@ -117,6 +117,7 @@ def post_review(email, password, maps_url, star_rating, business_name, review_pr
         ),
         disable_features="SigninIntercept,ChromeWhatsNewUI,AccountConsistency",
     )
+    sb.maximize_window()
     try:
         # --- Login check ---
         sb.sleep(10)
