@@ -226,4 +226,6 @@ def run_reviews(business_id, biz, config, delay=60):
             log.warning("post_review returned False for %s", review_row["email"])
         previous_email = review_row["email"]
 
-        time.sleep(delay)
+        actual_delay = random.uniform(delay, delay + 300)
+        log.info("Waiting %.0fs before next review...", actual_delay)
+        time.sleep(actual_delay)
