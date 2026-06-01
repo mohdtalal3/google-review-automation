@@ -129,9 +129,9 @@ def post_review(email, password, maps_url, star_rating, business_name, review_pr
             sb.sleep(3)
             sb.click("#identifierNext", timeout=15)
             sb.sleep(5)
-            sb.click('input[type="password"]', timeout=10)
+            sb.click('input[type="password"]', timeout=30)
             sb.sleep(3)
-            sb.type('input[type="password"]', password, timeout=10)
+            sb.type('input[type="password"]', password, timeout=30)
             sb.sleep(3)
             sb.click("#passwordNext", timeout=15)
             sb.sleep(5)
@@ -143,42 +143,55 @@ def post_review(email, password, maps_url, star_rating, business_name, review_pr
         sb.get(maps_url)
         sb.sleep(random.uniform(3, 5))
 
-        sb.click('button[aria-label*="Reviews"]', timeout=15)
+        sb.click('button[aria-label*="Reviews"]', timeout=30)
         sb.sleep(random.uniform(3, 5))
 
         sb.click('button[aria-label="Write a review"]', timeout=30)
         sb.sleep(random.uniform(3, 5))
 
         # --- Confirm the review iframe is open before generating text ---
-        sb.wait_for_element_visible(iframe_sel, timeout=15)
+        sb.wait_for_element_visible(iframe_sel, timeout=30)
+        sb.sleep(7)  # Let iframe content fully render
 
-        # Generate review text now that we know the write box is open
+        review_area = sb.get_nested_element(iframe_sel, 'textarea[aria-label="Enter review"]')
+        review_area.click()  # Focus the textarea to ensure it's ready for input
+        time.sleep(3)  # Ensure textarea is focused and ready for input
+        # Select star rating first so the dialog stays active during Gemini call
+        sb.nested_click(iframe_sel, f"div[data-rating='{star_rating}'][role='radio']")
+        sb.sleep(random.uniform(2, 5))
+
+        # Generate review text now that we know the write box is open and star is selected
         review_text = generate_review(business_name, review_prompt, star_rating)
         log.info("Review generated for %s", email)
 
-        # Select star rating
-        sb.nested_click(iframe_sel, f"div[data-rating='{star_rating}'][role='radio']")
-        sb.sleep(random.uniform(3, 5))
-
         # Type review text into the textarea inside the iframe
         review_area = sb.get_nested_element(iframe_sel, 'textarea[aria-label="Enter review"]')
+        if review_area is None:
+            raise RuntimeError("Could not find review textarea inside iframe")
         review_area.type(review_text)
+        sb.sleep(random.uniform(2, 5))
+
+        # Click the Post button inside the iframe by text content (stable, no dynamic attributes)
+        sb.evaluate("""
+            var iframe = document.querySelector("iframe[name='goog-reviews-write-widget']");
+            var doc = iframe.contentDocument || iframe.contentWindow.document;
+            var buttons = doc.querySelectorAll('button');
+            for (var btn of buttons) {
+                if (btn.textContent.trim() === 'Post') { btn.click(); break; }
+            }
+        """)
         sb.sleep(random.uniform(3, 5))
 
-        # Click the Post button (inside the iframe)
-        sb.nested_click(iframe_sel, 'button[aria-label="Post"]')
+        # Click Done (also inside the iframe)
+        sb.nested_click(iframe_sel, 'button[aria-label="Done"]')
         sb.sleep(random.uniform(3, 5))
-
-        # Click Done (back in the main document)
-        sb.click('button[aria-label="Done"]', timeout=10)
-
         db.update_review_status(email_id, "reviewed", review_text, star_rating)
         log.info("Review posted successfully for %s", email)
         return True
 
     except Exception as exc:
         log.error("post_review failed for %s: %s", email, exc)
-        log.debug(traceback.format_exc())
+        log.error(traceback.format_exc())
         db.update_review_status(email_id, "pending", None, star_rating)
         return False
 
