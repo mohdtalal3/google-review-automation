@@ -140,23 +140,23 @@ def post_review(email, password, maps_url, star_rating, business_name, review_pr
             sb.click_if_visible('input[name="confirm"]', timeout=30)
 
         # --- Navigate to Maps listing ---
-        sb.sleep(random.uniform(1, 5))
+        sb.sleep(random.uniform(10, 15))
         sb.get(maps_url)
-        sb.sleep(random.uniform(3, 5))
+        sb.sleep(random.uniform(5, 10))
 
         sb.click('button[aria-label*="Reviews"]', timeout=30)
-        sb.sleep(random.uniform(3, 5))
+        sb.sleep(random.uniform(5, 10))
 
         sb.click('button[aria-label="Write a review"]', timeout=30)
-        sb.sleep(random.uniform(3, 5))
+        sb.sleep(random.uniform(5, 10))
 
         # --- Confirm the review iframe is open before generating text ---
         sb.wait_for_element_visible(iframe_sel, timeout=30)
-        sb.sleep(7)  # Let iframe content fully render
+        sb.sleep(15)  # Let iframe content fully render
 
         review_area = sb.get_nested_element(iframe_sel, 'textarea[aria-label="Enter review"]')
         review_area.click()  # Focus the textarea to ensure it's ready for input
-        time.sleep(3)  # Ensure textarea is focused and ready for input
+        time.sleep(5)  # Ensure textarea is focused and ready for input
         # Select star rating first so the dialog stays active during Gemini call
         sb.nested_click(iframe_sel, f"div[data-rating='{star_rating}'][role='radio']")
         sb.sleep(random.uniform(2, 5))
