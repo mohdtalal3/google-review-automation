@@ -140,6 +140,7 @@ def post_review(email, password, maps_url, star_rating, business_name, review_pr
             sb.click_if_visible('input[name="confirm"]', timeout=30)
 
         # --- Navigate to Maps listing ---
+        sb.sleep(random.uniform(1, 5))
         sb.get(maps_url)
         sb.sleep(random.uniform(3, 5))
 
