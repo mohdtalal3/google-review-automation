@@ -158,7 +158,7 @@ def post_review(email, password, maps_url, star_rating, business_name, review_pr
         sb.sleep(random.uniform(5, 10))
 
         sb.click('button[aria-label*="Reviews"]', timeout=30)
-        sb.sleep(random.uniform(5, 10))
+        sb.sleep(random.uniform(10, 15))
 
         sb.click('button[aria-label="Write a review"]', timeout=30)
         sb.sleep(random.uniform(5, 10))
