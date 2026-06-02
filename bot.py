@@ -55,7 +55,6 @@ SYSTEM_PROMPT = """You are an expert at writing authentic Google business review
 Your reviews sound completely natural and human written.
 Never use asterisks, dashes, bullet points, numbered lists, or any special formatting characters.
 Write in plain conversational prose only.
-Keep reviews between 2 and 4 sentences.
 Vary the writing style and vocabulary each time so reviews never repeat themselves."""
 
 
@@ -68,13 +67,26 @@ _STAR_TONE = {
     5: "enthusiastic and highly satisfied, describing an outstanding experience",
 }
 
+_TYPE_LENGTH = {
+    'short': '1 to 2 sentences only',
+    'medium': '2 to 4 sentences',
+    'long': '5 to 8 sentences',
+}
 
-def generate_review(business_name, review_prompt, star_rating):
+
+def generate_review(business_name, review_prompt, star_rating, review_type='medium', language='English'):
+    if review_type == 'no_text':
+        return ''
+
     client = genai.Client(api_key=GEMINI_API_KEY)
 
     tone = _STAR_TONE.get(star_rating, _STAR_TONE[5])
+    length_instruction = _TYPE_LENGTH.get(review_type, _TYPE_LENGTH['medium'])
+    lang_instruction = f'Write the entire review in {language}.' if language != 'English' else ''
 
     prompt = f"""Write a Google review that is {tone}.
+{lang_instruction}
+Keep the review to {length_instruction}.
 
 Business name: {business_name}
 Business details and writing instructions: {review_prompt}
@@ -92,7 +104,7 @@ Write only the review text with no labels, headings, or extra commentary."""
     return response.text.strip()
 
 
-def post_review(email, password, maps_url, star_rating, business_name, review_prompt, email_id, recovery_email=None):
+def post_review(email, password, maps_url, star_rating, business_name, review_prompt, email_id, recovery_email=None, review_type='medium', language='English'):
     safe_name = email.replace("@", "_at_").replace(".", "_")
     profile_dir = os.path.abspath(os.path.join("chrome_profiles", safe_name))
     os.makedirs(profile_dir, exist_ok=True)
@@ -163,15 +175,16 @@ def post_review(email, password, maps_url, star_rating, business_name, review_pr
         sb.sleep(random.uniform(2, 5))
 
         # Generate review text now that we know the write box is open and star is selected
-        review_text = generate_review(business_name, review_prompt, star_rating)
-        log.info("Review generated for %s", email)
+        review_text = generate_review(business_name, review_prompt, star_rating, review_type, language)
+        log.info("Review generated for %s (type=%s, lang=%s)", email, review_type, language)
 
-        # Type review text into the textarea inside the iframe
-        review_area = sb.get_nested_element(iframe_sel, 'textarea[aria-label="Enter review"]')
-        if review_area is None:
-            raise RuntimeError("Could not find review textarea inside iframe")
-        review_area.type(review_text)
-        sb.sleep(random.uniform(2, 5))
+        # Type review text into the textarea inside the iframe (skip for no_text reviews)
+        if review_text:
+            review_area = sb.get_nested_element(iframe_sel, 'textarea[aria-label="Enter review"]')
+            if review_area is None:
+                raise RuntimeError("Could not find review textarea inside iframe")
+            review_area.type(review_text)
+            sb.sleep(random.uniform(2, 5))
 
         # Click the Post button inside the iframe by text content (stable, no dynamic attributes)
         sb.evaluate("""
@@ -222,6 +235,8 @@ def run_reviews(business_id, biz, config, delay=60):
             config.get("business_description", ""),
             review_row["id"],
             recovery_email=previous_email,
+            review_type=review_row.get("review_type") or "medium",
+            language=review_row.get("review_language") or "English",
         )
         if not success:
             log.warning("post_review returned False for %s", review_row["email"])

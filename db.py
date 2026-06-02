@@ -45,6 +45,8 @@ def init_db():
                 status TEXT DEFAULT 'pending',
                 review_text TEXT,
                 star_rating INTEGER,
+                review_type TEXT DEFAULT 'medium',
+                review_language TEXT DEFAULT 'English',
                 reviewed_at TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (email_id) REFERENCES emails(id),
@@ -190,13 +192,29 @@ def get_pending_reviews(business_id):
         return [dict(r) for r in rows]
 
 
-def create_review_jobs(business_id, star_list):
+def create_review_jobs(business_id, star_list, type_list=None, language_list=None):
     """
     Assign emails from the global pool to this business run.
     star_list is an ordered list like [5, 5, 4, 4, 1] — one entry per email.
+    type_list is an ordered list like ['short', 'long', 'no_text', 'medium'].
+    language_list is an ordered list like ['English', 'Spanish', 'French'].
+    All three lists are pre-shuffled by the caller for randomness.
     Already-pending emails are skipped and counted separately.
     Returns (newly_created, already_pending).
     """
+    n = len(star_list)
+    # Pad type_list with 'medium' if shorter than star_list
+    effective_types = list(type_list or [])
+    while len(effective_types) < n:
+        effective_types.append('medium')
+    effective_types = effective_types[:n]
+
+    # Pad language_list with 'English' if shorter than star_list
+    effective_langs = list(language_list or [])
+    while len(effective_langs) < n:
+        effective_langs.append('English')
+    effective_langs = effective_langs[:n]
+
     with get_db() as conn:
         # Emails already assigned to this business with pending status
         pending_email_ids = {
@@ -222,13 +240,13 @@ def create_review_jobs(business_id, star_list):
         available = [r["id"] for r in all_emails if r["id"] not in used]
 
         count = 0
-        for idx, star in enumerate(star_list):
+        for idx, (star, rtype, lang) in enumerate(zip(star_list, effective_types, effective_langs)):
             if idx >= len(available):
                 break
             conn.execute(
-                "INSERT INTO reviews (email_id, business_id, star_rating, status) "
-                "VALUES (?, ?, ?, 'pending')",
-                (available[idx], business_id, star),
+                "INSERT INTO reviews (email_id, business_id, star_rating, review_type, review_language, status) "
+                "VALUES (?, ?, ?, ?, ?, 'pending')",
+                (available[idx], business_id, star, rtype, lang),
             )
             count += 1
         return count, len(pending_email_ids)
@@ -251,6 +269,16 @@ def migrate_add_delay_seconds():
             conn.execute(
                 "ALTER TABLE review_configs ADD COLUMN delay_seconds INTEGER DEFAULT 60"
             )
+
+
+def migrate_add_review_type_language():
+    """Add review_type and review_language columns to reviews table (safe to call multiple times)."""
+    with get_db() as conn:
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(reviews)").fetchall()]
+        if "review_type" not in cols:
+            conn.execute("ALTER TABLE reviews ADD COLUMN review_type TEXT DEFAULT 'medium'")
+        if "review_language" not in cols:
+            conn.execute("ALTER TABLE reviews ADD COLUMN review_language TEXT DEFAULT 'English'")
 
 
 def reset_stuck_reviewing():

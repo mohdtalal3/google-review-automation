@@ -1,6 +1,7 @@
 import csv
 import io
 import os
+import random
 from datetime import timedelta
 from functools import wraps
 
@@ -202,7 +203,7 @@ def delete_review(business_id, review_id):
 @app.route("/business/<int:business_id>/start-bot", methods=["POST"])
 @login_required
 def start_bot(business_id):
-    # Star counts come directly from the form — no need to read from saved config
+    # Star counts come directly from the form
     star_list = []
     for star in range(1, 6):
         count = int(request.form.get(f"star_{star}_count") or 0)
@@ -211,7 +212,24 @@ def start_bot(business_id):
     if not star_list:
         return jsonify({"status": "error", "message": "Select at least one star rating with a count > 0."})
 
-    created, already_pending = db.create_review_jobs(business_id, star_list)
+    # Build review type list
+    type_list = []
+    for rtype in ['short', 'medium', 'long', 'no_text']:
+        count = int(request.form.get(f"type_{rtype}_count") or 0)
+        type_list.extend([rtype] * count)
+
+    # Build language list
+    language_list = []
+    for lang in ['English', 'Spanish', 'French', 'German', 'Italian', 'Portuguese', 'Arabic', 'Chinese']:
+        count = int(request.form.get(f"lang_{lang.lower()}_count") or 0)
+        language_list.extend([lang] * count)
+
+    # Shuffle all three lists independently so assignments are random
+    random.shuffle(star_list)
+    random.shuffle(type_list)
+    random.shuffle(language_list)
+
+    created, already_pending = db.create_review_jobs(business_id, star_list, type_list, language_list)
     if created == 0 and already_pending == 0:
         return jsonify({"status": "error", "message": "No new emails available to assign."})
 
@@ -221,5 +239,6 @@ def start_bot(business_id):
 if __name__ == "__main__":
     db.init_db()
     db.migrate_add_delay_seconds()
+    db.migrate_add_review_type_language()
     #app.run(debug=True, port=5000)
     app.run(host="0.0.0.0", port=5000, debug=False)

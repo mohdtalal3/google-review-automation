@@ -53,6 +53,7 @@ def process_pending_jobs():
 def main():
     db.init_db()
     db.migrate_add_delay_seconds()
+    db.migrate_add_review_type_language()
     db.reset_stuck_reviewing()
     log.info("Worker started. Reset any stuck 'reviewing' jobs to 'pending'.")
     log.info("Worker started. Polling every %ds for pending jobs.", POLL_INTERVAL)
