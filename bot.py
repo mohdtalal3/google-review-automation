@@ -165,11 +165,22 @@ def post_review(email, password, maps_url, star_rating, business_name, review_pr
 
         # --- Confirm the review iframe is open before generating text ---
         sb.wait_for_element_visible(iframe_sel, timeout=30)
-        sb.sleep(15)  # Let iframe content fully render
+        sb.sleep(5)  # Brief wait before polling for the textarea
 
-        review_area = sb.get_nested_element(iframe_sel, 'textarea[aria-label="Enter review"]')
+        # Wait for the textarea inside the iframe to become available (up to 60s)
+        review_area = None
+        for _attempt in range(24):  # 24 × 2.5s = 60s max
+            review_area = sb.get_nested_element(iframe_sel, 'textarea[aria-label="Enter review"]')
+            if review_area is not None:
+                break
+            log.debug("Waiting for review textarea (attempt %d/24)...", _attempt + 1)
+            time.sleep(2.5)
+        if review_area is None:
+            raise RuntimeError("Review textarea never appeared inside iframe after 60s")
+
         review_area.click()  # Focus the textarea to ensure it's ready for input
-        time.sleep(5)  # Ensure textarea is focused and ready for input
+        time.sleep(3)
+
         # Select star rating first so the dialog stays active during Gemini call
         sb.nested_click(iframe_sel, f"div[data-rating='{star_rating}'][role='radio']")
         sb.sleep(random.uniform(2, 5))
