@@ -118,6 +118,57 @@
           </span>
         </div>
 
+        <!-- Email selector -->
+        <div class="border border-slate-700 rounded-xl mb-4">
+          <button type="button" onclick="toggleEmailSelector()"
+                  class="w-full flex items-center justify-between px-4 py-2.5
+                         text-xs font-semibold text-slate-300 uppercase tracking-wide
+                         hover:bg-slate-700/50 rounded-xl transition-colors">
+            <span>Email Selection
+              <span id="email-sel-badge"
+                    class="ml-2 normal-case font-normal text-slate-400">
+                (all <span id="email-sel-count">{{ all_emails | length }}</span> selected)
+              </span>
+            </span>
+            <svg id="email-sel-chevron" class="w-4 h-4 transition-transform" fill="none"
+                 stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
+
+          <div id="email-selector-panel" class="hidden px-4 pb-4">
+            <div class="flex gap-2 mb-3 pt-1">
+              <button type="button" onclick="selectAllEmails()"
+                      class="text-xs text-blue-400 hover:text-blue-300 transition-colors">
+                Select All
+              </button>
+              <span class="text-slate-600">·</span>
+              <button type="button" onclick="deselectAllEmails()"
+                      class="text-xs text-slate-400 hover:text-slate-300 transition-colors">
+                Deselect All
+              </button>
+            </div>
+            <div class="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+              {% for em in all_emails %}
+              <label class="flex items-center gap-2.5 cursor-pointer group">
+                <input type="checkbox" name="email_checkbox" value="{{ em.id }}"
+                       class="email-checkbox w-4 h-4 rounded bg-slate-700 border-slate-500
+                              accent-blue-500 cursor-pointer"
+                       checked
+                       onchange="updateEmailSelectionBadge(); updateCounter();" />
+                <span class="text-xs text-slate-300 group-hover:text-white transition-colors truncate">
+                  {{ em.email }}
+                </span>
+                {% if em.flagged %}
+                <span class="text-xs text-orange-400 shrink-0">flagged</span>
+                {% endif %}
+              </label>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+
         <!-- Over-limit warning -->
         <div id="limit-warning"
              class="hidden mb-3 bg-red-950 border border-red-700 text-red-300
@@ -327,6 +378,7 @@
                     {% if r.status == 'reviewed' %}bg-green-950 text-green-400
                     {% elif r.status == 'reviewing' %}bg-yellow-950 text-yellow-400
                     {% elif r.status == 'failed' %}bg-red-950 text-red-400
+                    {% elif r.status == 'flagged' %}bg-orange-950 text-orange-400
                     {% else %}bg-slate-700 text-slate-400{% endif %}">
                     {{ r.status }}
                   </span>
@@ -341,7 +393,7 @@
                       View
                     </button>
                     {% endif %}
-                    {% if r.status in ['failed', 'reviewed'] %}
+                    {% if r.status in ['failed', 'reviewed', 'flagged'] %}
                     <form method="POST"
                           action="/business/{{ business.id }}/reset-review/{{ r.id }}"
                           class="inline">
@@ -436,6 +488,10 @@
       document.querySelectorAll('.lang-input').forEach(inp => {
         formData.append(inp.id, inp.value);
       });
+      // Include selected email IDs (empty list = all deselected, so at least warn)
+      document.querySelectorAll('.email-checkbox:checked').forEach(cb => {
+        formData.append('selected_email_ids', cb.value);
+      });
 
       fetch(`/business/${BUSINESS_ID}/start-bot`, { method: 'POST', body: formData })
         .then(r => r.json())
@@ -459,7 +515,51 @@
     }
 
     // ── Star distribution counter ──────────────────────────────────────────────
-    const AVAILABLE = {{ total_pool - already_queued - already_reviewed }};
+    const TOTAL_AVAILABLE = {{ total_pool - already_queued - already_reviewed }};
+
+    function getSelectedEmailCount() {
+      return document.querySelectorAll('.email-checkbox:checked').length;
+    }
+
+    function getAvailable() {
+      // Effective available = min(total pool available, selected emails count)
+      // (selected emails may include already-used ones but server handles that;
+      //  we approximate with the checkbox count for UI feedback)
+      const selected = getSelectedEmailCount();
+      const total = document.querySelectorAll('.email-checkbox').length;
+      if (selected === total) return TOTAL_AVAILABLE;
+      return Math.min(TOTAL_AVAILABLE, selected);
+    }
+
+    function toggleEmailSelector() {
+      const panel = document.getElementById('email-selector-panel');
+      const chevron = document.getElementById('email-sel-chevron');
+      panel.classList.toggle('hidden');
+      chevron.style.transform = panel.classList.contains('hidden') ? '' : 'rotate(180deg)';
+    }
+
+    function selectAllEmails() {
+      document.querySelectorAll('.email-checkbox').forEach(cb => { cb.checked = true; });
+      updateEmailSelectionBadge();
+      updateCounter();
+    }
+
+    function deselectAllEmails() {
+      document.querySelectorAll('.email-checkbox').forEach(cb => { cb.checked = false; });
+      updateEmailSelectionBadge();
+      updateCounter();
+    }
+
+    function updateEmailSelectionBadge() {
+      const checked = getSelectedEmailCount();
+      const total   = document.querySelectorAll('.email-checkbox').length;
+      const badge   = document.getElementById('email-sel-badge');
+      const countEl = document.getElementById('email-sel-count');
+      countEl.textContent = checked;
+      badge.innerHTML = checked === total
+        ? `(all <span id="email-sel-count">${checked}</span> selected)`
+        : `(<span id="email-sel-count">${checked}</span> / ${total} selected)`;
+    }
 
     // Reset all type/lang inputs to 0 on page load to avoid browser-restored values
     document.querySelectorAll('.type-input, .lang-input').forEach(inp => { inp.value = 0; });
@@ -489,7 +589,7 @@
       const queueBtn   = document.getElementById('start-bot-btn');
       const hintsDiv   = document.getElementById('queue-hints');
 
-      const overAvail  = starTotal > AVAILABLE;
+      const overAvail  = starTotal > getAvailable();
       const lenOk      = starTotal > 0 && lenTotal  === starTotal;
       const langOk     = starTotal > 0 && langTotal === starTotal;
       const ready      = !overAvail && lenOk && langOk;

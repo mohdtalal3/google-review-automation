@@ -105,6 +105,7 @@ def business(business_id):
     reviews = db.get_reviews_for_business(business_id)
     config = db.get_review_config(business_id)
     is_running = any(r["status"] == "reviewing" for r in reviews)
+    all_emails = db.get_all_emails()
     total_pool = db.count_emails()
     already_queued = db.count_queued_for_business(business_id)
     already_reviewed = db.count_reviewed_for_business(business_id)
@@ -114,6 +115,7 @@ def business(business_id):
         reviews=reviews,
         config=config,
         is_running=is_running,
+        all_emails=all_emails,
         total_pool=total_pool,
         already_queued=already_queued,
         already_reviewed=already_reviewed,
@@ -203,6 +205,10 @@ def delete_review(business_id, review_id):
 @app.route("/business/<int:business_id>/start-bot", methods=["POST"])
 @login_required
 def start_bot(business_id):
+    # Optional email filter — if none submitted, use all
+    selected_email_ids = request.form.getlist("selected_email_ids")
+    allowed_email_ids = [int(x) for x in selected_email_ids if x.isdigit()] if selected_email_ids else None
+
     # Star counts come directly from the form
     star_list = []
     for star in range(1, 6):
@@ -229,7 +235,7 @@ def start_bot(business_id):
     random.shuffle(type_list)
     random.shuffle(language_list)
 
-    created, already_pending = db.create_review_jobs(business_id, star_list, type_list, language_list)
+    created, already_pending = db.create_review_jobs(business_id, star_list, type_list, language_list, allowed_email_ids=allowed_email_ids)
     if created == 0 and already_pending == 0:
         return jsonify({"status": "error", "message": "No new emails available to assign."})
 
@@ -240,5 +246,6 @@ if __name__ == "__main__":
     db.init_db()
     db.migrate_add_delay_seconds()
     db.migrate_add_review_type_language()
+    db.migrate_add_email_fail_tracking()
     #app.run(debug=True, port=5000)
     app.run(host="0.0.0.0", port=5000, debug=False)

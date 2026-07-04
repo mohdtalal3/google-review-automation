@@ -179,25 +179,30 @@ def get_reviews_for_business(business_id):
 
 
 def get_pending_reviews(business_id):
-    """Emails assigned to this business run that haven't been posted yet."""
+    """Emails assigned to this business run that haven't been posted yet.
+    Excludes emails that have been flagged after too many failures.
+    """
     with get_db() as conn:
         rows = conn.execute(
             """SELECT r.*, e.email, e.password
                FROM reviews r
                JOIN emails e ON e.id = r.email_id
                WHERE r.business_id = ? AND r.status = 'pending'
+                 AND e.flagged = 0
                ORDER BY r.created_at ASC""",
             (business_id,),
         ).fetchall()
         return [dict(r) for r in rows]
 
 
-def create_review_jobs(business_id, star_list, type_list=None, language_list=None):
+def create_review_jobs(business_id, star_list, type_list=None, language_list=None, allowed_email_ids=None):
     """
     Assign emails from the global pool to this business run.
     star_list is an ordered list like [5, 5, 4, 4, 1] — one entry per email.
     type_list is an ordered list like ['short', 'long', 'no_text', 'medium'].
     language_list is an ordered list like ['English', 'Spanish', 'French'].
+    allowed_email_ids: optional list of email IDs to restrict assignment to.
+                       If None, all emails in the pool are eligible.
     All three lists are pre-shuffled by the caller for randomness.
     Already-pending emails are skipped and counted separately.
     Returns (newly_created, already_pending).
@@ -237,7 +242,11 @@ def create_review_jobs(business_id, star_list, type_list=None, language_list=Non
         all_emails = conn.execute(
             "SELECT id FROM emails ORDER BY created_at ASC"
         ).fetchall()
-        available = [r["id"] for r in all_emails if r["id"] not in used]
+        available = [
+            r["id"] for r in all_emails
+            if r["id"] not in used
+            and (allowed_email_ids is None or r["id"] in set(allowed_email_ids))
+        ]
 
         count = 0
         for idx, (star, rtype, lang) in enumerate(zip(star_list, effective_types, effective_langs)):
@@ -279,6 +288,43 @@ def migrate_add_review_type_language():
             conn.execute("ALTER TABLE reviews ADD COLUMN review_type TEXT DEFAULT 'medium'")
         if "review_language" not in cols:
             conn.execute("ALTER TABLE reviews ADD COLUMN review_language TEXT DEFAULT 'English'")
+
+
+def migrate_add_email_fail_tracking():
+    """Add fail_count and flagged columns to emails table (safe to call multiple times)."""
+    with get_db() as conn:
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(emails)").fetchall()]
+        if "fail_count" not in cols:
+            conn.execute("ALTER TABLE emails ADD COLUMN fail_count INTEGER DEFAULT 0")
+        if "flagged" not in cols:
+            conn.execute("ALTER TABLE emails ADD COLUMN flagged INTEGER DEFAULT 0")
+
+
+def increment_email_fail_count(email_id, threshold=5):
+    """Increment the fail counter for an email.
+    If it reaches *threshold*, mark the email as flagged and set all its
+    pending/reviewing review jobs to 'flagged' so they are never retried.
+    Returns True if the email was just flagged, False otherwise.
+    """
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE emails SET fail_count = fail_count + 1 WHERE id = ?",
+            (email_id,),
+        )
+        row = conn.execute(
+            "SELECT fail_count, flagged FROM emails WHERE id = ?", (email_id,)
+        ).fetchone()
+        if row and row["fail_count"] >= threshold and not row["flagged"]:
+            conn.execute(
+                "UPDATE emails SET flagged = 1 WHERE id = ?", (email_id,)
+            )
+            conn.execute(
+                "UPDATE reviews SET status = 'flagged' "
+                "WHERE email_id = ? AND status IN ('pending', 'reviewing')",
+                (email_id,),
+            )
+            return True
+        return False
 
 
 def reset_stuck_reviewing():

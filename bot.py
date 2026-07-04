@@ -251,6 +251,12 @@ def run_reviews(business_id, biz, config, delay=60):
         )
         if not success:
             log.warning("post_review returned False for %s", review_row["email"])
+            flagged = db.increment_email_fail_count(review_row["email_id"])
+            if flagged:
+                log.warning(
+                    "Email %s has failed 5 times — flagged and removed from all pending jobs.",
+                    review_row["email"],
+                )
         previous_email = review_row["email"]
 
         actual_delay = random.uniform(delay, delay + 300)
