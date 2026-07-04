@@ -150,7 +150,7 @@ def post_review(email, password, maps_url, star_rating, business_name, review_pr
             sb.sleep(5)
 
             # Dismiss optional confirm / recovery prompts
-            sb.click_if_visible('input[name="confirm"]', timeout=30)
+            sb.click_if_visible('button[data-primary-action-label="I understand"]', timeout=30)
 
         # --- Navigate to Maps listing ---
         sb.sleep(random.uniform(10, 15))
