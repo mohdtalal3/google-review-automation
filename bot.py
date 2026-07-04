@@ -115,7 +115,7 @@ def post_review(email, password, maps_url, star_rating, business_name, review_pr
     sb = sb_cdp.Chrome(
         "https://accounts.google.com/signin/v2/identifier",
         user_data_dir=profile_dir,
-       # proxy=PROXY,
+        proxy=PROXY,
         agent=fp["ua"],
         window_size=fp["res"],
         locale_code=fp["locale"],
