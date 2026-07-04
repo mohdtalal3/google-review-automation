@@ -127,7 +127,7 @@
             <span>Email Selection
               <span id="email-sel-badge"
                     class="ml-2 normal-case font-normal text-slate-400">
-                (all <span id="email-sel-count">{{ all_emails | length }}</span> selected)
+              (all <span id="email-sel-count">{{ selectable_email_count }}</span> selected)
               </span>
             </span>
             <svg id="email-sel-chevron" class="w-4 h-4 transition-transform" fill="none"
@@ -151,16 +151,20 @@
             </div>
             <div class="space-y-1.5 max-h-48 overflow-y-auto pr-1">
               {% for em in all_emails %}
-              <label class="flex items-center gap-2.5 cursor-pointer group">
+              {% set is_used = em.id in used_email_ids %}
+              <label class="flex items-center gap-2.5 {{ 'cursor-not-allowed opacity-50' if is_used else 'cursor-pointer group' }}">
                 <input type="checkbox" name="email_checkbox" value="{{ em.id }}"
                        class="email-checkbox w-4 h-4 rounded bg-slate-700 border-slate-500
-                              accent-blue-500 cursor-pointer"
-                       checked
+                              accent-blue-500 {{ 'cursor-not-allowed' if is_used else 'cursor-pointer' }}"
+                       {{ 'checked' if not is_used else '' }}
+                       {{ 'disabled' if is_used else '' }}
                        onchange="updateEmailSelectionBadge(); updateCounter();" />
-                <span class="text-xs text-slate-300 group-hover:text-white transition-colors truncate">
+                <span class="text-xs {{ 'text-slate-500' if is_used else 'text-slate-300 group-hover:text-white' }} transition-colors truncate">
                   {{ em.email }}
                 </span>
-                {% if em.flagged %}
+                {% if is_used %}
+                <span class="text-xs text-yellow-500 shrink-0">already assigned</span>
+                {% elif em.flagged %}
                 <span class="text-xs text-orange-400 shrink-0">flagged</span>
                 {% endif %}
               </label>
@@ -178,7 +182,7 @@
               d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3
                  L13.71 3.86a2 2 0 00-3.42 0z"/>
           </svg>
-          Exceeds available emails. Reduce the counts.
+          Exceeds selected available emails. Reduce the count or select more emails.
         </div>
 
         <div class="space-y-2.5 mb-4">
@@ -518,17 +522,12 @@
     const TOTAL_AVAILABLE = {{ total_pool - already_queued - already_reviewed }};
 
     function getSelectedEmailCount() {
-      return document.querySelectorAll('.email-checkbox:checked').length;
+      return document.querySelectorAll('.email-checkbox:checked:not(:disabled)').length;
     }
 
     function getAvailable() {
-      // Effective available = min(total pool available, selected emails count)
-      // (selected emails may include already-used ones but server handles that;
-      //  we approximate with the checkbox count for UI feedback)
-      const selected = getSelectedEmailCount();
-      const total = document.querySelectorAll('.email-checkbox').length;
-      if (selected === total) return TOTAL_AVAILABLE;
-      return Math.min(TOTAL_AVAILABLE, selected);
+      // Only count checked boxes that are not disabled (i.e. not already assigned)
+      return document.querySelectorAll('.email-checkbox:checked:not(:disabled)').length;
     }
 
     function toggleEmailSelector() {
@@ -539,26 +538,24 @@
     }
 
     function selectAllEmails() {
-      document.querySelectorAll('.email-checkbox').forEach(cb => { cb.checked = true; });
+      document.querySelectorAll('.email-checkbox:not(:disabled)').forEach(cb => { cb.checked = true; });
       updateEmailSelectionBadge();
       updateCounter();
     }
 
     function deselectAllEmails() {
-      document.querySelectorAll('.email-checkbox').forEach(cb => { cb.checked = false; });
+      document.querySelectorAll('.email-checkbox:not(:disabled)').forEach(cb => { cb.checked = false; });
       updateEmailSelectionBadge();
       updateCounter();
     }
 
     function updateEmailSelectionBadge() {
-      const checked = getSelectedEmailCount();
-      const total   = document.querySelectorAll('.email-checkbox').length;
-      const badge   = document.getElementById('email-sel-badge');
-      const countEl = document.getElementById('email-sel-count');
-      countEl.textContent = checked;
-      badge.innerHTML = checked === total
+      const checked   = document.querySelectorAll('.email-checkbox:checked:not(:disabled)').length;
+      const selectable = document.querySelectorAll('.email-checkbox:not(:disabled)').length;
+      const badge     = document.getElementById('email-sel-badge');
+      badge.innerHTML = checked === selectable
         ? `(all <span id="email-sel-count">${checked}</span> selected)`
-        : `(<span id="email-sel-count">${checked}</span> / ${total} selected)`;
+        : `(<span id="email-sel-count">${checked}</span> / ${selectable} selected)`;
     }
 
     // Reset all type/lang inputs to 0 on page load to avoid browser-restored values
@@ -631,7 +628,7 @@
       const warning  = document.getElementById('limit-warning');
 
       countEl.textContent = total;
-      const over = total > AVAILABLE;
+      const over = total > getAvailable();
       countEl.className = over ? 'font-semibold text-red-400' : 'font-semibold text-white';
       warning.classList.toggle('hidden', !over);
       warning.classList.toggle('flex', over);

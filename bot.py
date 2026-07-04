@@ -115,7 +115,7 @@ def post_review(email, password, maps_url, star_rating, business_name, review_pr
     sb = sb_cdp.Chrome(
         "https://accounts.google.com/signin/v2/identifier",
         user_data_dir=profile_dir,
-        proxy=PROXY,
+       # proxy=PROXY,
         agent=fp["ua"],
         window_size=fp["res"],
         locale_code=fp["locale"],
@@ -136,9 +136,9 @@ def post_review(email, password, maps_url, star_rating, business_name, review_pr
 
         if "accounts.google.com/v3/signin" in sb.get_current_url():
             sb.sleep(2)
-            sb.click('input[type="email"]', timeout=15)
+            sb.click('input[aria-label="Email or phone"]', timeout=15)
             sb.sleep(3)
-            sb.type('input[type="email"]', email, timeout=15)
+            sb.type('input[aria-label="Email or phone"]', email, timeout=15)
             sb.sleep(3)
             sb.click("#identifierNext", timeout=15)
             sb.sleep(5)

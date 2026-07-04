@@ -106,6 +106,8 @@ def business(business_id):
     config = db.get_review_config(business_id)
     is_running = any(r["status"] == "reviewing" for r in reviews)
     all_emails = db.get_all_emails()
+    used_email_ids = {r["email_id"] for r in reviews}
+    selectable_email_count = sum(1 for e in all_emails if e["id"] not in used_email_ids)
     total_pool = db.count_emails()
     already_queued = db.count_queued_for_business(business_id)
     already_reviewed = db.count_reviewed_for_business(business_id)
@@ -116,6 +118,8 @@ def business(business_id):
         config=config,
         is_running=is_running,
         all_emails=all_emails,
+        used_email_ids=used_email_ids,
+        selectable_email_count=selectable_email_count,
         total_pool=total_pool,
         already_queued=already_queued,
         already_reviewed=already_reviewed,
@@ -248,4 +252,4 @@ if __name__ == "__main__":
     db.migrate_add_review_type_language()
     db.migrate_add_email_fail_tracking()
     #app.run(debug=True, port=5000)
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    app.run(host="0.0.0.0", port=5001, debug=False)
