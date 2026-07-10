@@ -154,7 +154,12 @@ def add_email(email, password, totp_secret=None):
                 (email, password, totp_secret),
             )
             return True
-        return False
+        else:
+            conn.execute(
+                "UPDATE emails SET password = ?, totp_secret = ? WHERE email = ?",
+                (password, totp_secret, email),
+            )
+            return False
 
 
 def delete_email(email_id):

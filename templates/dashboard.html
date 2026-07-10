@@ -198,5 +198,37 @@
     {% endif %}
 
   </div>
+
+  <!-- Upload result toast -->
+  <div id="toast" class="fixed bottom-6 right-6 z-50 hidden px-5 py-3 rounded-xl shadow-xl
+                          text-sm font-medium text-white max-w-xs"></div>
+  <script>
+    (function () {
+      const p = new URLSearchParams(window.location.search);
+      const inserted = parseInt(p.get("uploaded") || "0", 10);
+      const updated  = parseInt(p.get("updated")  || "0", 10);
+      const err      = p.get("upload_error") || "";
+      const toast    = document.getElementById("toast");
+
+      if (err) {
+        toast.textContent = "Upload failed: " + err;
+        toast.classList.add("bg-red-600");
+        toast.classList.remove("hidden");
+      } else if (inserted > 0 || updated > 0) {
+        const parts = [];
+        if (inserted > 0) parts.push(inserted + " added");
+        if (updated  > 0) parts.push(updated  + " updated");
+        toast.textContent = "✓ " + parts.join(", ");
+        toast.classList.add("bg-green-600");
+        toast.classList.remove("hidden");
+      }
+
+      if (!toast.classList.contains("hidden")) {
+        setTimeout(() => toast.classList.add("hidden"), 4000);
+        // Clean URL without reloading
+        history.replaceState(null, "", window.location.pathname);
+      }
+    })();
+  </script>
 </body>
 </html>
