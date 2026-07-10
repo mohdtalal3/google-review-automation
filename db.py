@@ -34,6 +34,7 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 email TEXT UNIQUE NOT NULL,
                 password TEXT NOT NULL,
+                totp_secret TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
@@ -142,15 +143,15 @@ def count_reviewed_for_business(business_id):
         return row["cnt"]
 
 
-def add_email(email, password):
+def add_email(email, password, totp_secret=None):
     with get_db() as conn:
         existing = conn.execute(
             "SELECT id FROM emails WHERE email = ?", (email,)
         ).fetchone()
         if not existing:
             conn.execute(
-                "INSERT INTO emails (email, password) VALUES (?, ?)",
-                (email, password),
+                "INSERT INTO emails (email, password, totp_secret) VALUES (?, ?, ?)",
+                (email, password, totp_secret),
             )
             return True
         return False
@@ -168,7 +169,7 @@ def get_reviews_for_business(business_id):
     """Returns all review jobs for a business joined with email credentials."""
     with get_db() as conn:
         rows = conn.execute(
-            """SELECT r.*, e.email, e.password
+            """SELECT r.*, e.email, e.password, e.totp_secret
                FROM reviews r
                JOIN emails e ON e.id = r.email_id
                WHERE r.business_id = ?
@@ -184,7 +185,7 @@ def get_pending_reviews(business_id):
     """
     with get_db() as conn:
         rows = conn.execute(
-            """SELECT r.*, e.email, e.password
+            """SELECT r.*, e.email, e.password, e.totp_secret
                FROM reviews r
                JOIN emails e ON e.id = r.email_id
                WHERE r.business_id = ? AND r.status = 'pending'
@@ -288,6 +289,14 @@ def migrate_add_review_type_language():
             conn.execute("ALTER TABLE reviews ADD COLUMN review_type TEXT DEFAULT 'medium'")
         if "review_language" not in cols:
             conn.execute("ALTER TABLE reviews ADD COLUMN review_language TEXT DEFAULT 'English'")
+
+
+def migrate_add_totp_secret():
+    """Add totp_secret column to emails table (safe to call multiple times)."""
+    with get_db() as conn:
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(emails)").fetchall()]
+        if "totp_secret" not in cols:
+            conn.execute("ALTER TABLE emails ADD COLUMN totp_secret TEXT")
 
 
 def migrate_add_email_fail_tracking():

@@ -54,6 +54,7 @@ def main():
     db.init_db()
     db.migrate_add_delay_seconds()
     db.migrate_add_review_type_language()
+    db.migrate_add_totp_secret()
     db.migrate_add_email_fail_tracking()
     db.reset_stuck_reviewing()
     log.info("Worker started. Reset any stuck 'reviewing' jobs to 'pending'.")

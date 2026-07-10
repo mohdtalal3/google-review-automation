@@ -2,3 +2,4 @@ flask
 python-dotenv
 seleniumbase
 google-genai
+pyotp

@@ -5,6 +5,8 @@ import random
 import time
 import traceback
 
+import pyotp
+
 from dotenv import load_dotenv
 from seleniumbase import sb_cdp
 import google.genai as genai
@@ -104,7 +106,7 @@ Write only the review text with no labels, headings, or extra commentary."""
     return response.text.strip()
 
 
-def post_review(email, password, maps_url, star_rating, business_name, review_prompt, email_id, recovery_email=None, review_type='medium', language='English'):
+def post_review(email, password, maps_url, star_rating, business_name, review_prompt, email_id, recovery_email=None, review_type='medium', language='English', totp_secret=None):
     safe_name = email.replace("@", "_at_").replace(".", "_")
     profile_dir = os.path.abspath(os.path.join("chrome_profiles", safe_name))
     os.makedirs(profile_dir, exist_ok=True)
@@ -148,9 +150,21 @@ def post_review(email, password, maps_url, star_rating, business_name, review_pr
             sb.sleep(3)
             sb.click("#passwordNext", timeout=15)
             sb.sleep(5)
-
-            # Dismiss optional confirm / recovery prompts
-            sb.click_if_visible('button[data-primary-action-label="I understand"]', timeout=30)
+            
+            try:
+                sb.wait_for_element_visible('input[name="totpPin"]', timeout=20)
+                totp_code = pyotp.TOTP(totp_secret).now() if totp_secret else ""
+                sb.click('input[name="totpPin"]', timeout=10)
+                sb.sleep(3)
+                sb.type('input[name="totpPin"]', totp_code, timeout=10)
+                sb.sleep(3)
+                sb.click("#totpNext", timeout=15)
+                sb.sleep(5)
+            except Exception:
+                pass
+            sb.click_if_visible('button[aria-label="Cancel"]', timeout=10)
+            sb.sleep(3)
+            sb.click_if_visible('button[aria-label="Skip"]', timeout=10)
 
         # --- Navigate to Maps listing ---
         sb.sleep(random.uniform(10, 15))
@@ -248,6 +262,7 @@ def run_reviews(business_id, biz, config, delay=60):
             recovery_email=previous_email,
             review_type=review_row.get("review_type") or "medium",
             language=review_row.get("review_language") or "English",
+            totp_secret=review_row.get("totp_secret"),
         )
         if not success:
             log.warning("post_review returned False for %s", review_row["email"])

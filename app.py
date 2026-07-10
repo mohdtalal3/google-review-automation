@@ -146,7 +146,11 @@ def save_config(business_id):
 @app.route("/emails/sample-csv")
 @login_required
 def sample_csv():
-    content = "email,password\nexample1@gmail.com,yourpassword1\nexample2@gmail.com,yourpassword2\n"
+    content = (
+        "email,password,totp_secret\n"
+        "example1@gmail.com,yourpassword1,\n"
+        "example2@gmail.com,yourpassword2,JBSWY3DPEHPK3PXP\n"
+    )
     return Response(
         content,
         mimetype="text/csv",
@@ -162,12 +166,28 @@ def upload_emails():
     csv_file = request.files.get("csv_file")
     if csv_file and csv_file.filename:
         content = csv_file.read().decode("utf-8-sig")
-        reader = csv.DictReader(io.StringIO(content))
-        for row in reader:
-            email = (row.get("email") or "").strip()
-            password = (row.get("password") or "").strip()
-            if email and password:
-                db.add_email(email, password)
+        first_line = content.strip().split("\n")[0]
+        if "\t" in first_line and "User ID" in first_line:
+            # New G2G tab-separated format
+            reader = csv.DictReader(io.StringIO(content), delimiter="\t")
+            for row in reader:
+                row = {k.strip(): (v or "").strip() for k, v in row.items()}
+                email = row.get("User ID / Email Address", "").lstrip("'")
+                password = row.get("Password", "")
+                secret_q = row.get("First Secret Question", "").lower()
+                totp_secret = row.get("First Secret Answer", "") if secret_q == "2fa" else None
+                totp_secret = totp_secret or None
+                if email and password:
+                    db.add_email(email, password, totp_secret=totp_secret)
+        else:
+            # Legacy format: email,password[,totp_secret]
+            reader = csv.DictReader(io.StringIO(content))
+            for row in reader:
+                email = (row.get("email") or "").strip()
+                password = (row.get("password") or "").strip()
+                totp_secret = (row.get("totp_secret") or "").strip() or None
+                if email and password:
+                    db.add_email(email, password, totp_secret=totp_secret)
     return redirect(url_for("dashboard"))
 
 
@@ -176,8 +196,9 @@ def upload_emails():
 def add_email():
     email = request.form.get("email", "").strip()
     password = request.form.get("password", "").strip()
+    totp_secret = request.form.get("totp_secret", "").strip() or None
     if email and password:
-        db.add_email(email, password)
+        db.add_email(email, password, totp_secret=totp_secret)
     return redirect(url_for("dashboard"))
 
 
@@ -250,6 +271,7 @@ if __name__ == "__main__":
     db.init_db()
     db.migrate_add_delay_seconds()
     db.migrate_add_review_type_language()
+    db.migrate_add_totp_secret()
     db.migrate_add_email_fail_tracking()
     #app.run(debug=True, port=5000)
     app.run(host="0.0.0.0", port=5000, debug=False)
