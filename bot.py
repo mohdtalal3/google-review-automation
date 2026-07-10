@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 from seleniumbase import sb_cdp
 import google.genai as genai
 from google.genai import types
-
+from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
 import db
 
 load_dotenv()
@@ -168,7 +168,24 @@ def post_review(email, password, maps_url, star_rating, business_name, review_pr
 
         # --- Navigate to Maps listing ---
         sb.sleep(random.uniform(10, 15))
+        # Open the original URL (handles redirects)
         sb.get(maps_url)
+        sb.sleep(5)
+
+        # Get the final URL after redirect
+        current_url = sb.get_current_url()
+
+        # Add hl=en
+        parsed = urlparse(current_url)
+        query = dict(parse_qsl(parsed.query))
+        query["hl"] = "en"
+
+        english_url = urlunparse(
+            parsed._replace(query=urlencode(query))
+        )
+
+        # Reopen in English
+        sb.get(english_url)
         sb.sleep(random.uniform(5, 10))
 
         sb.click('button[aria-label*="Reviews"]', timeout=30)
