@@ -14,7 +14,7 @@ import logging
 from dotenv import load_dotenv
 
 import db
-import bot
+import bot_donut as bot
 
 load_dotenv()
 
@@ -46,7 +46,7 @@ def process_pending_jobs():
             "Processing business '%s' (id=%s) with %ds delay between reviews.",
             biz["name"], biz_id, delay,
         )
-        bot.run_reviews(biz_id, biz, config, delay=delay)
+        bot.run_reviews_donut(biz_id, biz, config, delay=delay)
         log.info("Finished business '%s' (id=%s).", biz["name"], biz_id)
 
 

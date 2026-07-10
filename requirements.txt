@@ -3,3 +3,5 @@ python-dotenv
 seleniumbase
 google-genai
 pyotp
+playwright
+requests
