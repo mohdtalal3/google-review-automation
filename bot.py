@@ -13,7 +13,7 @@ import google.genai as genai
 from google.genai import types
 from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
 import db
-
+import re
 load_dotenv()
 
 log = logging.getLogger(__name__)
@@ -160,7 +160,6 @@ def post_review(email, password, maps_url, star_rating, business_name, review_pr
                 sb.sleep(3)
                 sb.click("#totpNext", timeout=15)
                 sb.sleep(5)
-                input("Press Enter to continue...")
             except Exception:
                 pass
             try:
