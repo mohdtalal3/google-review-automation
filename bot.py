@@ -20,7 +20,7 @@ log = logging.getLogger(__name__)
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 PROXY = os.environ.get("PROXY", "")
-
+print(PROXY)
 
 def get_fingerprint(email):
     """Generate a deterministic fingerprint based on the email address."""
