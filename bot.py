@@ -163,9 +163,26 @@ def post_review(email, password, maps_url, star_rating, business_name, review_pr
                 input("Press Enter to continue...")
             except Exception:
                 pass
-            sb.click_if_visible('button[aria-label="Cancel"]', timeout=10)
-            sb.sleep(3)
-            sb.click_if_visible('button[aria-label="Skip"]', timeout=10)
+            try:
+                sb.sleep(random.uniform(3, 6))
+                current_url = sb.get_current_url()
+                # Replace normal hl=<anything>
+                english_url = re.sub(r'([?&]hl=)[^&]+', r'\1en', current_url)
+
+                # Replace URL-encoded hl%3D<anything> inside nested URLs
+                english_url = re.sub(r'hl%3D[^%&]+', 'hl%3Den', english_url)
+
+                # Optional: if there was no hl parameter at all, add one
+                if "hl=" not in urllib.parse.unquote(english_url):
+                    separator = "&" if "?" in english_url else "?"
+                    english_url += f"{separator}hl=en"
+                sb.get(english_url)
+                sb.sleep(random.uniform(5, 10))
+                sb.click_if_visible('button[aria-label="Cancel"]', timeout=10)
+                sb.sleep(3)
+                sb.click_if_visible('button[aria-label="Skip"]', timeout=10)
+            except Exception:
+                pass
 
         # --- Navigate to Maps listing ---
         sb.sleep(random.uniform(10, 15))
