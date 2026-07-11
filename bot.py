@@ -14,6 +14,7 @@ from google.genai import types
 from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
 import db
 import re
+import urllib.parse
 load_dotenv()
 
 log = logging.getLogger(__name__)
