@@ -160,6 +160,7 @@ def post_review(email, password, maps_url, star_rating, business_name, review_pr
                 sb.sleep(3)
                 sb.click("#totpNext", timeout=15)
                 sb.sleep(5)
+                input("Press Enter to continue...")
             except Exception:
                 pass
             sb.click_if_visible('button[aria-label="Cancel"]', timeout=10)
